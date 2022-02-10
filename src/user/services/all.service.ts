@@ -20,12 +20,22 @@ import { AssignCategoryToImageDto } from '../dto/assign-category-to-image.dto';
 import { CreateImageDto } from '../dto/create-image.dto';
 import { UserService } from './user.service';
 import { CreateUserDto } from '../dto/create-user.dto';
+import { RateToPaintDto } from '../dto/rate-to-paint.dto';
+import { RateEntity } from '../entities/rate.entity';
+import stream from 'node:stream';
+import { stringify } from 'querystring';
+import { Repository } from 'typeorm';
+import { FeedbackToPaintDto } from '../dto/feedback-to-paint.dto';
+import { FeedbackEntity } from '../entities/feedback.entity';
+import { reportUnhandledError } from 'rxjs/dist/types/internal/util/reportUnhandledError';
 
 @Injectable()
 export class AllService {
 constructor(@InjectRepository(CategoryRepository) private categoryRepository:CategoryRepository,
             @InjectRepository(ImageRepository) private imageRepository:ImageRepository,
             @InjectRepository(UserRepository) private userRepository:UserRepository,
+            @InjectRepository(RateEntity) private rateRepo:Repository<RateEntity>,
+            @InjectRepository(FeedbackEntity) private feedBackRepo:Repository<FeedbackEntity>,
             private userService:UserService
             ) {
 }
@@ -121,5 +131,64 @@ constructor(@InjectRepository(CategoryRepository) private categoryRepository:Cat
         }
         const assignCategoryToImage=await this.assignCategoryToImage(assignCategoryToImageDto)
           return assignImageToUser
+  }
+
+  async rateToPaint(rateToPaintDto:RateToPaintDto):Promise<any>
+  {
+    const findPaint=await this.imageRepository.findOne({where:{id:rateToPaintDto.paintId,deleted:false},relations:["obj_rates"]})
+    if (!findPaint)
+      throw new BadRequestException("Paint Not Found")
+    if (rateToPaintDto.rate<1 && rateToPaintDto.rate>5)
+      throw new BadRequestException(`Rate is Not Ok`)
+    const rate=new RateEntity()
+    rate.rate=rateToPaintDto.rate
+    rate.obj_image=findPaint
+    const save=await this.rateRepo.save(rate)
+
+    findPaint.obj_rates.push(save)
+    const savePaint=await this.imageRepository.save(findPaint)
+    return savePaint
+  }
+
+  async feedbackToPaint(feedbackToPaintDto:FeedbackToPaintDto):Promise<any>
+  {
+    const findPaint=await this.imageRepository.findOne({where:{id:feedbackToPaintDto.paintId,deleted:false},relations:["obj_feedbacks"]})
+    if (!findPaint)
+      throw new BadRequestException(`Paint NoT fOUND`)
+
+    const feedback=new FeedbackEntity()
+    feedback.comment=feedbackToPaintDto.feedback
+    feedback.obj_image=findPaint
+    const save=await this.feedBackRepo.save(feedback)
+
+    findPaint.obj_feedbacks.push(save)
+    const savePaint=await this.imageRepository.save(findPaint)
+    return savePaint
+  }
+
+  async userPaints(mobile:string):Promise<ImageEntity[]>
+  {
+    const findUser=await this.userRepository.findOne({where:{phone:mobile},relations:["obj_images"]})
+      return findUser.obj_images
+  }
+
+  async allPaints():Promise<ImageEntity[]>
+  {
+    const paints=await this.imageRepository.find({relations:["obj_feedbacks","obj_rates","obj_user"]})
+    return paints
+  }
+
+  async highRatePaint():Promise<UserEntity[]>
+  {
+    let users:UserEntity[]
+    const findPaint=await this.imageRepository.find({relations:["obj_rates"]})
+    for (let paint of findPaint) {
+      const highRates=paint.obj_rates.find(x=>x.rate==5)
+      const findPaint=await this.imageRepository.findOne({where:{obj_rates:highRates},relations:["obj_rates"]})
+      const findUser=await this.userRepository.findOne({where:{obj_images:findPaint},relations:["obj_images"]})
+      users.push(findUser)
+    }
+
+    return users
   }
 }

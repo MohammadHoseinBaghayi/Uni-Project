@@ -2,7 +2,7 @@ import {
   Body,
   ConflictException,
   Controller, Get, Param,
-  Post,
+  Post, Query,
   UploadedFile,
   UseInterceptors,
   ValidationPipe,
@@ -15,6 +15,10 @@ import { CategoryEntity } from '../entities/category.entity';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { IsNotEmpty } from 'class-validator';
+import { RateToPaintDto } from '../dto/rate-to-paint.dto';
+import { FeedbackToPaintDto } from '../dto/feedback-to-paint.dto';
+import { ImageEntity } from '../entities/image.entity';
+import { UserEntity } from '../entities/user.entity';
 
 @ApiTags("All Routes")
 @Controller("all")
@@ -59,5 +63,35 @@ export class AllController {
   async createPaint(@Body(ValidationPipe) createUserDto:CreateUserDto,@UploadedFile("file") file:Express.Multer.File,@Param("category") category_id:number,@Param("description") description:string):Promise<any>
   {
   return await this.allService.createPaint(createUserDto, file, description, category_id)
+  }
+
+  @Post("rate/to/paint")
+  async rateToPaint(@Body() rateToPaintDto:RateToPaintDto):Promise<any>
+  {
+    return await this.allService.rateToPaint(rateToPaintDto)
+  }
+
+  @Post("feedback/to/paint")
+  async feedbackToPaint(@Body() feedbackToPaintDto:FeedbackToPaintDto):Promise<any>
+  {
+  return await this.allService.feedbackToPaint(feedbackToPaintDto)
+  }
+
+  @Get("user/paints")
+  async userPaints(@Query("mobile") mobile:string):Promise<any>
+  {
+    return await this.allService.userPaints(mobile)
+  }
+
+  @Get("get/all/paints")
+  async allPaints():Promise<any>
+  {
+    return await this.allService.allPaints()
+  }
+
+  @Get("best/users")
+  async highRatePaint():Promise<UserEntity[]>
+  {
+    return await this.allService.highRatePaint()
   }
 }
